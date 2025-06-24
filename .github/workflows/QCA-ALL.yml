@@ -60,7 +60,6 @@ jobs:
       #插件调整
       WRT_PACKAGE: |
         ${{inputs.PACKAGE}}
-        # 在这里添加 fancontrol 软件包的名称，例如：
         luci-app-fancontrol
       # === 添加以下新的输入参数 ===
       WRT_CUSTOM_FEEDS: |
