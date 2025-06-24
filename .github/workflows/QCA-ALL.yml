@@ -61,7 +61,7 @@ jobs:
       WRT_PACKAGE: |
         ${{inputs.PACKAGE}}
         # 在这里添加 fancontrol 软件包的名称，例如：
-        luci-app-fancontrol # 请根据实际情况替换为 fancontrol feed 提供的软件包名称
+        luci-app-fancontrol
       # === 添加以下新的输入参数 ===
       WRT_CUSTOM_FEEDS: |
         src-git fancontrol https://github.com/JiaY-shi/fancontrol.git
