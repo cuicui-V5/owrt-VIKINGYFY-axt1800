@@ -1,14 +1,12 @@
-#CI项目
+# QCA-ALL.yml
 name: QCA-ALL
 
 #CI计划
 on:
-  #自动编译：当Auto-Clean运行完成后
   workflow_run:
     workflows: ["Auto-Clean"]
     types:
       - completed
-  #手动编译
   workflow_dispatch:
     inputs:
       PACKAGE:
@@ -60,6 +58,13 @@ jobs:
       #源码名称
       WRT_SOURCE: ${{matrix.SOURCE}}
       #插件调整
-      WRT_PACKAGE: ${{inputs.PACKAGE}}
+      WRT_PACKAGE: |
+        ${{inputs.PACKAGE}}
+        # 在这里添加 fancontrol 软件包的名称，例如：
+        luci-app-fancontrol # 请根据实际情况替换为 fancontrol feed 提供的软件包名称
+      # === 添加以下新的输入参数 ===
+      WRT_CUSTOM_FEEDS: |
+        src-git fancontrol https://github.com/JiaY-shi/fancontrol.git
+      # =============================
       #仅输出配置文件
       WRT_TEST: ${{inputs.TEST}}
