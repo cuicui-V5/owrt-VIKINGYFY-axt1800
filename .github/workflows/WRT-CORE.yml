@@ -40,12 +40,6 @@ on:
       WRT_TEST:
         required: false
         type: string
-      # === 新增输入参数：自定义软件包源 ===
-      WRT_CUSTOM_FEEDS:
-        description: '自定义OpenWrt软件包源，每行一个。格式：src-git <name> <url>'
-        required: false
-        type: string
-      # ==================================
 
 env:
   GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
@@ -61,9 +55,6 @@ env:
   WRT_SOURCE: ${{inputs.WRT_SOURCE}}
   WRT_PACKAGE: ${{inputs.WRT_PACKAGE}}
   WRT_TEST: ${{inputs.WRT_TEST}}
-  # === 新增环境变量：自定义软件包源 ===
-  WRT_CUSTOM_FEEDS: ${{inputs.WRT_CUSTOM_FEEDS}}
-  # ==================================
 
 jobs:
   core:
@@ -77,8 +68,6 @@ jobs:
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
-          # 确保在执行系统级操作前，切换到安全的非root用户，如果不是已经在非root用户下
-          # 或者使用sudo -E来执行需要root权限的命令
           sudo -E apt -yqq purge firefox
           sudo -E apt -yqq update
           sudo -E apt -yqq full-upgrade
@@ -99,7 +88,6 @@ jobs:
           echo "WRT_DATE=$(TZ=UTC-8 date +"%y.%m.%d-%H.%M.%S")" >> $GITHUB_ENV
           echo "WRT_MARK=${GITHUB_REPOSITORY%%/*}" >> $GITHUB_ENV
           echo "WRT_INFO=${WRT_SOURCE%%/*}" >> $GITHUB_ENV
-          # 这里的路径可能需要根据实际的.config文件位置调整
           echo "WRT_TARGET=$(grep -m 1 -oP '^CONFIG_TARGET_\K[\w]+(?=\=y)' ./Config/$WRT_CONFIG.txt)" >> $GITHUB_ENV
           echo "WRT_KVER=none" >> $GITHUB_ENV
           echo "WRT_LIST=none" >> $GITHUB_ENV
@@ -156,120 +144,46 @@ jobs:
             echo "caches cleanup done!"
           fi
 
-      # === 新增步骤：添加自定义软件包源到 feeds.conf.default ===
-      - name: Add Custom Feeds
-        if: env.WRT_CUSTOM_FEEDS != '' # 仅当 WRT_CUSTOM_FEEDS 非空时执行
-        run: |
-          cd ./wrt/
-          echo "${{ env.WRT_CUSTOM_FEEDS }}" >> feeds.conf.default
-          echo "Added custom feeds to feeds.conf.default"
-      # =======================================================
-
-      - name: Update Feeds # 更新所有默认 feeds，然后更新并安装自定义 feeds
+      - name: Update Feeds
         run: |
           cd ./wrt/
 
-          echo "Updating all default feeds..."
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
-          # === 扩展原有步骤：更新并安装自定义 feeds ===
-          if [ -n "${{ env.WRT_CUSTOM_FEEDS }}" ]; then
-            echo "Updating and installing custom feeds..."
-            # 逐行读取 WRT_CUSTOM_FEEDS，提取 feed 名称并执行 update/install
-            echo "${{ env.WRT_CUSTOM_FEEDS }}" | while read -r line; do
-              # 提取 src-git 或 src-svn 或 src-git-full 后的第一个单词作为 feed 名称
-              feed_name=$(echo "$line" | awk '{print $2}')
-              if [ -n "$feed_name" ]; then
-                echo "Processing custom feed: $feed_name"
-                ./scripts/feeds update "$feed_name"
-                ./scripts/feeds install -a -f -p "$feed_name"
-              else
-                echo "Warning: Could not extract feed name from line: $line"
-              fi
-            done
-            echo "Custom feeds update and install completed."
-          fi
-          # =============================================
-
-      - name: Custom Packages # 运行自定义脚本来处理插件包
+      - name: Custom Packages
         run: |
           cd ./wrt/package/
-          # 假设 $GITHUB_WORKSPACE/Scripts/Packages.sh 和 $GITHUB_WORKSPACE/Scripts/Handles.sh
-          # 会读取 WRT_PACKAGE 环境变量并据此修改 .config 文件，启用/禁用相应的软件包。
-          # 确保这些脚本能够正确处理 fancontrol feed 中提供的软件包名称。
+
           $GITHUB_WORKSPACE/Scripts/Packages.sh
           $GITHUB_WORKSPACE/Scripts/Handles.sh
 
-      - name: Custom Settings # 应用自定义设置和配置
+      - name: Custom Settings
         run: |
           cd ./wrt/
 
-          # 1. 首先，生成一个基础的 .config 文件
-          # 这一步会根据你的目标平台和子平台生成一个最小化的 .config
-          # 确保在执行此命令前，你的目标系统和子系统已经在其他地方被正确设置（通常在Config/$WRT_CONFIG.txt中）
-          make defconfig
-
-          # 2. 加载你的自定义配置
-          # 这里使用 cp 而不是 cat >>，以确保文件内容是正确的，避免追加带来的格式问题
-          # 如果你的 Config/$WRT_CONFIG.txt 是完整的 .config 文件内容，并且你想替换掉 make defconfig 产生的
-          # 则使用 cp。如果只是追加少量配置，需要更精细的合并策略。
-          # 鉴于你的报错是 "missing separator"，很可能原来是想替换或作为主要配置。
           if [[ "${WRT_CONFIG,,}" == *"test"* ]]; then
-            cp $GITHUB_WORKSPACE/Config/$WRT_CONFIG.txt .config
+            cat $GITHUB_WORKSPACE/Config/$WRT_CONFIG.txt >> .config
           else
-            # 如果是合并，确保两个文件都是有效的 .config 片段，并且合并逻辑正确
-            # 简单 cat 合并可能导致问题，特别是当 GENERAL.txt 中也包含 CONFIG_TARGET 等基础配置时
-            # 更好的做法是：先加载 WRT_CONFIG.txt，然后逐行处理 GENERAL.txt 中的差异
-            # 但为了快速修复，我们先假设这些文件是兼容的追加片段
-            cp $GITHUB_WORKSPACE/Config/$WRT_CONFIG.txt .config
-            cat $GITHUB_WORKSPACE/Config/GENERAL.txt >> .config # 追加通用配置
+            cat $GITHUB_WORKSPACE/Config/$WRT_CONFIG.txt $GITHUB_WORKSPACE/Config/GENERAL.txt >> .config
           fi
 
-          # 3. 处理 WRT_PACKAGE 环境变量，启用或禁用指定的软件包
-          # 这一步非常关键，它将根据 QCA-ALL.yml 中 WRT_PACKAGE 传入的包名，修改 .config 文件
-          if [ -n "${{ env.WRT_PACKAGE }}" ]; then
-            echo "Processing custom packages from WRT_PACKAGE..."
-            echo "${{ env.WRT_PACKAGE }}" | while read -r package_name; do
-              if [ -n "$package_name" ]; then
-                # 将包名中的 '-' 替换为 '_'，因为 .config 文件中的宏通常使用下划线
-                config_name=$(echo "$package_name" | tr '-' '_')
-                # 尝试启用该软件包。如果存在 'is not set'，则替换为 '=y'
-                # 如果是多行，确保每一行都被处理
-                sed -i "/# CONFIG_PACKAGE_${config_name} is not set/cCONFIG_PACKAGE_${config_name}=y" .config
-                # 如果包名是 kmod-xxx，可能需要处理 CONFIG_KMOD_xxx
-                sed -i "/# CONFIG_KMOD_${config_name} is not set/cCONFIG_KMOD_${config_name}=y" .config
-                # 某些包可能没有 CONFIG_PACKAGE_ 前缀，例如 CONFIG_LUCI_LANG_zh_cn
-                # 这里只处理最常见的 CONFIG_PACKAGE_ 形式，如果遇到其他特殊包，需要单独添加 sed 规则
-                echo "Attempted to enable: $package_name (CONFIG_PACKAGE_${config_name}=y)"
-              fi
-            done
-          fi
-
-          # 4. 运行自定义设置脚本
-          # 假设 $GITHUB_WORKSPACE/Scripts/Settings.sh 也会修改 .config
           $GITHUB_WORKSPACE/Scripts/Settings.sh
 
-          # 5. 最后，再次运行 make defconfig，确保所有修改后的配置都生效，
-          # 并解决可能的依赖问题和配置冲突
-          echo "Running final make defconfig..."
-          make defconfig -j$(nproc)
-
-          # 清理编译产物，准备重新编译
-          make clean -j$(nproc)
-
+          make defconfig -j$(nproc) && make clean -j$(nproc)
 
       - name: Download Packages
         if: env.WRT_TEST != 'true'
         run: |
           cd ./wrt/
+
           make download -j$(nproc)
 
       - name: Compile Firmware
         if: env.WRT_TEST != 'true'
         run: |
           cd ./wrt/
-          # 尝试编译，如果第一次失败，则尝试详细输出模式
+
           make -j$(nproc) || make -j$(nproc) V=s
 
       - name: Machine Information
