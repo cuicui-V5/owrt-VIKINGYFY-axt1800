@@ -1,3 +1,21 @@
+# 高质量<免费>交流群
+
+点击链接加入群聊【IPQ技术讨论群】：https://qm.qq.com/q/v7nMhzB4oU
+该群为普通交流群。
+
+# 高质量<付费>中转站
+
+点击链接加入群聊【LiBwrt-Ai学习】：https://qm.qq.com/q/HTa7OiWNCU
+该群为AI中转站群。
+
+# 本地编译器
+
+https://github.com/VIKINGYFY/OWRT-Tools.git
+
+# 自用修改版插件
+
+https://github.com/VIKINGYFY/packages.git
+
 # OpenWRT-CI
 
 官方版：
@@ -12,11 +30,7 @@ https://github.com/VIKINGYFY/immortalwrt.git
 
 高通版-沉心：
 
-https://github.com/chenxin527/uboot-ipq60xx-emmc-build.git
-
-https://github.com/chenxin527/uboot-ipq60xx-nand-build.git
-
-https://github.com/chenxin527/uboot-ipq60xx-nor-build.git
+https://github.com/chenxin527/uboot-qsdk12.5-build.git
 
 高通版-小猪：
 
@@ -32,7 +46,7 @@ https://drive.wrt.moe/uboot/mediatek
 
 # 固件简要说明
 
-固件每天早上6点自动编译。
+固件每天早上5点自动编译。
 
 固件信息里的时间为编译开始的时间，方便核对上游源码提交时间。
 
